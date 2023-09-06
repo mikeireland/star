@@ -1,2 +1,2 @@
 # star
-Undergraduate-level stellar modelling code.
+Undergraduate and Masters level stellar modelling code.

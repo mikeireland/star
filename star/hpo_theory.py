@@ -54,8 +54,6 @@ def find_derivatives(r_in_rsun, M_rho, entropy, rho_c):
     """
     M_in_Msun, rho = M_rho
     rho *= rho_c #Convert to cgs units
-    if rho < 0:
-        import pdb; pdb.set_trace()
     rhol = np.log10(rho.to(u.g/u.cm**3).value)
     
     #Mass continuity
@@ -79,7 +77,7 @@ def find_derivatives(r_in_rsun, M_rho, entropy, rho_c):
 def near_vacuum(r_in_rsun, M_rho,  entropy, rho_c):
     """Determine a surface condition by the surface pressure becoming low.
     
-    We'll use 1e-6 of central density as a surface condition.
+    We'll use 1e-8 of central density as a surface condition.
     """
     return M_rho[1] -1e-8
 
@@ -139,7 +137,7 @@ def convective_star_fixed_mass(T_c, M_in_Msun_target):
     T_c: Temperature, including astropy units.
     M_in_Msun_target: (M/M_sun) target mass.
     """
-    result = root_scalar(mass_difference, bracket=[3,300], args=(T_c, M_in_Msun_target,), xtol=1e-6)
+    result = root_scalar(mass_difference, bracket=[1,300], args=(T_c, M_in_Msun_target,), xtol=1e-6)
     r_in_Rsun, M_in_Msun, P, rho, T = convective_star(result.root*u.g/u.cm**3, T_c)
     return r_in_Rsun, M_in_Msun, P, rho, T
 
@@ -157,4 +155,5 @@ if __name__=="__main__":
     #The 0.28 M_sun example from 2021
     r_in_Rsun, M_in_Msun, P, rho, T = convective_star_fixed_mass(8e6*u.K, 0.28)
     print("Radius of star solved for with 0.28 M_sun: {:.3f}".format(r_in_Rsun[-1]))
+    plt.plot(rho, T)
     
