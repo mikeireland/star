@@ -1,0 +1,74 @@
+%OOPS - the conversion from gamma relating P and rho to gamma relating T and P assumed rho proportional to P/T, which isn't correct for a variable mean molecular weight.
+%Too late to fix for the assignment, but could be fixed for next year.
+
+\documentclass[12pt]{article}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\geometry{a4paper,tmargin=1.0cm,bmargin=2cm,lmargin=2cm,rmargin=2cm}
+\begin{document}
+\title{Opacities in Stellar Atmospheres}
+\author{Prof Mike Ireland}
+\maketitle
+
+\section{A Personal Introduction}
+
+Opacities were originally taught to me in 2 contexts: a perturbed Hydrogen atom Hamiltonian (without a mention of quantum field theory) and in an astrophysics context where the Einstein coefficients were somewhat {\em magical}. I use the word {\em magic} to describe any physical phenomena that doesn't have a quantitative explanation. The relationships between quantum mechanics, Einstein coefficients and cross sections were something I used but never fully understood.
+
+\section{Spontaneous Emission}
+
+The first place to begin in understanding opacities is spontaneous emission, i.e. the Einstein A coefficient. A derivation using Fermi's golden rule:
+
+\begin{align}
+A_{fi} = \Gamma_{i \rightarrow f} &= \frac{2\pi}{\hbar} | \langle f H' i\rangle |^2 \rho(E_f),
+\end{align}
+
+where the perturbation Hamiltonian for dipole radiation polarized in the $z$ direction is proportional to $q z/\epsilon_0$. The three terms in this equation seem to have SI units of $J^{-1} Hz$, $J^2$ and $J^{-1} m^{-3} $, but this is not quite correct as the final state $f$ also contains the continuum photon wavefunction. Rather than going through the complex derivation, we can simply write the result in different ways when decaying into a vacuum:
+
+\begin{align}
+A_{21} &= \frac{\omega^3 e^2 |\langle 1 | \mathbf{r} | 2 \rangle | ^2}{3\pi \epsilon_0 \hbar c^3}\\
+&= \frac{8 \pi^2 e^2 |\langle 1 | \mathbf{r} | 2 \rangle | ^2}{3 \hbar \epsilon_0 \lambda^3} \\
+&\lesssim \frac{4}{3} \alpha \left( \frac{2\pi r_A}{\lambda} \right)^2 \omega \\
+&= 2.4 \left( \frac{r_A}{\lambda} \right)^2 \nu,
+\end{align}
+
+where $\nu$ is the radiation frequency and $r_A$ is the Bohr radius. The expression is also given in terms of the fine structure constant $\alpha$ and angular frequency $\omega$, which shows a little better why the final constant of 2.4 is close to order unity. This is closer to an equality if the two states are approximately related by, for example, $\langle 2| \approx \langle 1| x|$. For example, for atomic Calcium which has a singlet transition from the first excited state to the ground state and an often listed atomic radius of 194\,pm, this relationship gives an Einstein A of no more than $3.6\times 10^{8}$\,Hz, which is very close to the true value of $2.2\times 10^8$\,Hz. In terms of fundamental units, the atomic radius is of order the Bohr radius.
+
+\section{Einstein $B$ and Cross Section}
+
+Linking a forward and reverse process to a single matrix element is a core prediction of quantum mechanics, going beyond Einstein A and B coefficients. The Einstein A and B coefficients are directly linked  is directly linked via:
+
+\begin{align}
+B_{12} &= A_{21} \frac{\lambda^3 g_2}{2h g_1},
+\end{align}
+
+and in turn the cross section is:
+
+\begin{align}
+\sigma_{12} &= \frac{h}{\lambda} B_{12} \phi_\nu \\
+&= \frac{\lambda^2 g_2}{2 g_1} A_{21} \phi_\nu \\
+&\lesssim 1.2 r_A^2 \frac{g_2}{g_1} \nu \phi_\nu \\
+&\approx r_A^2 \frac{g_2}{g_1} \frac{\lambda}{\Delta \lambda},
+\end{align}
+
+for a transition that covers a fractional bandwidth $\Delta \lambda$. This is a remarkably simple result, which will prove invaluable when determining the approximate relative strengths of different opacity sources.
+
+\section{Strong Atomic Lines}
+
+For L Dwarfs, strong atomic lines can be pressure broadened and cover the full spectrum. Key atomic line databases are NIST and VALD. Important lines from the ground or near-ground state, only counting wavelengths longer than 2700$\AA$ are:
+
+\begin{tabular}{llll} 
+Element & Abundance &Terms & Wavelength \\
+ \hline
+ Na I & -5.68 &  $^2P \rightarrow ^2S$ & 5889 \\ 
+ K I & -6.9 &  $^2P \rightarrow ^2S$ & 7665,7698 \\ 
+ Mg I & -4.43 & $^1P \rightarrow ^1S$ & 2852 \\ 
+ Ca I & -5.68 &  $^1P \rightarrow ^1S$ & 4227 \\ 
+ Al I & -5.6 & $^2S \rightarrow ^2P$ & 3944/3961 \\
+ \hline
+\end{tabular}
+
+For a round upper M dwarf atmosphere column density of 1\,g\,cm$^{-3}$, a relative abundance of $10^{-6}$ gives a number column density of $6\times10^{17}$\,cm$^{-2}$, and an optically-thick cross-section of (12\,pm)$^2$. 
+
+\end{document}
