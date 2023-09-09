@@ -108,14 +108,26 @@ At lower temperatures, molecules complicate the picture, as all atoms are couple
 
 \begin{align}
 P_A P_B &= K_{AB}(T)P_{AB}\\
-\log(P_A) + \log(P_B) - \log(P_{AB})&= \log(K_{AB}(T))\\
-\rho &= \frac{m_H(P_H + P_{H+} + 2P_{H_2})}{X k_B T}\\
-P_H + P_{H+} + 2P_{H_2} &= \frac{\rho X k_B T}{m_H}\\
-\sum_i k P_{(A_i)_k} &= \frac{\rho f_A k_B T}{m_A}\\
-&= \frac{\rho \epsilon_A k_B T}{\sum \epsilon_i m_i},
+\log(P_A) + \log(P_B) - \log(P_{AB})&= \log(K_{AB}(T))
 \end{align}
 
-where $f_i$ is the mass fraction of element $i$ and $\epsilon_i$ is the number fraction of element $i$. We now re-phrase the Saha equation as the same form as Russell (1934) noting that the partial pressure of electrons, $P_e = n_e k_B T$ at the low pressures in stellar atmospheres, giving:
+We can write the conservation of Hydrogen nuclei as:
+
+\begin{align}
+\rho &= \frac{m_H(P_H + P_{H+} + 2P_{H_2})}{X k_B T}\\
+P_H + P_{H+} + 2P_{H_2} &= \frac{\rho X k_B T}{m_H}.
+\end{align}
+
+For an arbitrary atom $A$, we can similarly write:
+
+\begin{align}
+\sum_i k P_{(A_i)_k} &= \frac{\rho f_A k_B T}{m_A}\\
+&= \frac{\rho \epsilon_A k_B T}{\sum \epsilon_i m_i} \\
+&= \frac{\epsilon_A }{\sum \epsilon_i \mu_i} \times P_\text{ref},{~where}:\\
+\sum_i k (P_{(A_i)_k} / P_\text{ref} ) &=  \frac{\epsilon_A }{\sum \epsilon_i \mu_i} ,
+\end{align}
+
+$f_i$ is the mass fraction of element $i$ and $\epsilon_i$ is the number fraction of element $i$. The reference pressure $P_\text{ref}$ is used so that the equation has terms of order unity. We now re-phrase the Saha equation as the same form as Russell (1934) noting that the partial pressure of electrons, $P_e = n_e k_B T$ at the low pressures in stellar atmospheres, giving:
 
 \begin{align}
 P_{A+}P_e &= \left( \frac{2 k_B T}{\lambda_e(T)^3} \frac{z_{i+1}(T)}{z_i(T)} \exp \left[  \frac{-E_{A \rightarrow A+}}{k_B T} \right] \right) P_A \\

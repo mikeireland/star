@@ -1,7 +1,8 @@
 """
 TODO:
-1) Make table for low T, starting at high T and iterating down.
-2) Output this table for students. 
+1) Output a complete table for convective star student use (not including M
+dwarfs)
+2) Add in TiO
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,6 +15,7 @@ import astropy.io.fits as pyfits
 from astropy.table import Table
 #For fsolve - no idea why this happens at high temperatures...
 import warnings
+plt.ion()
 warnings.filterwarnings('ignore', 'The iteration is not making good progress')
 tsuji_K = Table.read('../data/tsuji_K.dat', format='ascii.fixed_width_no_header', \
  names=('mol', 'c0', 'c1', 'c2','c3','c4','molcode','ediss','comment'), col_starts=(0,7,19,31,43,55,67,80,87))
@@ -26,31 +28,39 @@ delchi_const = (c.e.esu**2/(1*u.eV)).cgs.value
 def solarmet():
     """Return solar metalicity abundances by number and masses for low mass elements.
     From Asplund ete al (2009), up to an abundance of 1e-5 only plus Na, K, Ca. 
-    Degeneracy and ionization energies from IA05 in Scholz code"""
-    #                      H    He   C     N      O    Ne       Na      Mg    Si     S      K      Ca     Fe
-    n_p =        np.array([1,   2,   6,     7,     8,     10,     11,    12,    14,    16,   19,    20,    26])
-    masses=      np.array([1.0, 4.0, 12.01, 14.01, 16.00, 18.0,   22.99, 24.31, 28.09, 32.06,39.10, 40.08, 55.85])
-    abund = 10**(np.array([12, 10.93,8.43,  7.83,  8.69,  7.93,   6.24,  7.60,  7.51,  7.12, 5.03,  6.34,  7.50])-12)
-    ionI  =    np.array([13.595,24.58,11.26,14.53,13.61, 21.56,  5.14, 7.644, 8.149, 10.357,4.339, 6.111, 7.87])
-    ionII  =   np.array([0,54.403,24.376,29.593,35.108,40.96,47.29,  15.03,16.34, 23.40,  31.81, 11.87, 16.18])
+    Degeneracy and ionization energies from IA05 in Scholz code
+    
+    H++ is actually H-, and the code treats this appropriately as a special case"""
+    elt_names = np.array(['H', 'He',   'C',   'N',   'O',   'Ne',  'Na',  'Mg',  'Si',  'S',   'K',   'Ca',  'Fe'])
+    n_p =        np.array([1,   2,      6,     7,     8,     10,    11,    12,    14,    16,    19,    20,    26])
+    masses=      np.array([1.0, 4.0,    12.01, 14.01, 16.00, 18.0,  22.99, 24.31, 28.09, 32.06, 39.10, 40.08, 55.85])
+    abund = 10**(np.array([12, 10.93,   8.43,  7.83,  8.69,  7.93,  6.24,  7.60,  7.51,  7.12,  5.03,  6.34,  7.50])-12)
+    ionI  =      np.array([13.595,24.58,11.26, 14.53, 13.61, 21.56, 5.14,  7.644, 8.149, 10.357,4.339, 6.111, 7.87])
+    ionII  =     np.array([-0.754,  54.403,  24.376,29.593,35.108,40.96, 47.29, 15.03, 16.34, 23.40, 31.81, 11.87, 16.18])
+
     #Degeneracy of many of these elements are somewhat temperature-dependent,
     #as it is really a partition function. But as this is mostly H/He plus 
     #other elements as a mass reservoir and source of low-T
     #electrons, we're ignoring this. 
     gI =   np.array([2,1,9,4,9,1,2,1,9,9,2,1,25])
     gII =  np.array([1,2,6,9,4,6,1,2,6,4,1,2,30])
+    
     #A lot of these degeneracies are educated guesses! But we're not worried
     #about most elements in the doubly ionized state. 
-    gIII = np.array([0,1,1,6,9,9,6,1,1,9,6,1,30])
-    return abund, masses, n_p, ionI, ionII, gI, gII, gIII 
+    gIII = np.array([1,1,1,6,9,9,6,1,1,9,6,1,30])
+    return abund, masses, n_p, ionI, ionII, gI, gII, gIII, elt_names
     
 def equilibrium_equation(rho, T):
-    """Find the components of the equilibrium equation in matrix form.
+    """Find the components of the chemical equilibrium equation in matrix form.
     
     There are two parts - linear in partial pressures and logarithmic in 
     partial pressures. 
     """
-    abund, masses, n_p, ionI, ionII, gI, gII, gIII = solarmet()
+    #Input constants and abundances
+    abund, masses, n_p, ionI, ionII, gI, gII, gIII, elt_names = solarmet()
+    
+    #Find the reference pressure, which is the ideal gas pressure corresponding to
+    #atomic Hydrogen only.
     log_P_ref = np.log10( (rho*c.k_B*T/u.u).to(u.dyn/u.cm**2).value )
     nmol = len(tsuji_K)
     natom = len(abund)
@@ -59,6 +69,7 @@ def equilibrium_equation(rho, T):
     #for the electron.
     linear_matrix = np.zeros((natom+1, 1 + 2*natom + nmol))
     linear_b = np.zeros((natom + 1))
+    
     #The logarithmic matrix, with one equation per ion and one
     #for each molecule
     log_matrix = np.zeros((natom + nmol, 1 + 2*natom + nmol))
@@ -74,7 +85,6 @@ def equilibrium_equation(rho, T):
     linear_matrix[0,0] = -1
     
     #Next, the RHS of the equation.
-    linear_b[1:] = (rho*abund*c.k_B*T/np.sum(masses*abund)/u.u).to(u.dyn/u.cm**2).value
     linear_b[1:] = abund/np.sum(masses*abund)
     #Now, the atomic and ion part of the equation
     for i in range(natom):
@@ -105,53 +115,97 @@ def equilibrium_equation(rho, T):
     return linear_matrix, linear_b, log_matrix, log_b, log_P_ref
     
 def eq_solve_func(logps, linear_matrix, linear_b, log_matrix, log_b, log_P_ref, abund):
-    """Equation to put into scipy solve"""
+    """Equation to put into scipy solve.
+    
+    Returns:
+    --------
+    resid: np.array
+        concatenated log resids (n_atoms + n_mol) then concatenated linear resids 
+        (1 + n_atoms)
+    """
     ps = ( 10**(logps-log_P_ref) )
     log_part    = np.dot(log_matrix, logps) - log_b
     linear_part = np.dot(linear_matrix, ps) - linear_b 
+    #Dividing the linear part by the abundance just makes all numbers near 0 and the 
+    #same order of magnitude.
     linear_part[1:] /= abund
     return np.concatenate((log_part, linear_part))
     
 def equilibrium_solve(rho, T, plot=False):
+    """Solve for atomic and molecular equilibrium. 
+    
+    Parameters
+    ----------
+    rho:  
+         Dimensioned density
+    T:
+        Dimensioned temperature
+    
+    Returns:
+    --------
+    log(pressure) in dyn/cm^2 for:
+        e-, all neutrals A (13), ions A+ (13) elements, 
+        then pressure for each molecule (4), then finally H-
+        
+    """
     linear_matrix, linear_b, log_matrix, log_b, log_P_ref = equilibrium_equation(rho, T)
-    abund, masses, n_p, ionI, ionII, gI, gII, gIII = solarmet()
+    abund, masses, n_p, ionI, ionII, gI, gII, gIII, elt_names = solarmet()
+    
     #Start with almost no electrons or molecules, and atoms in proportion to 
     #their abundances.
-    x0 = np.ones(linear_matrix.shape[1])*log_P_ref - 12
-    x0[1:len(abund)+1] = log_P_ref + np.log10(abund)
+    #x0 = np.ones(linear_matrix.shape[1])*log_P_ref - 12
+    #x0[1:len(abund)+1] = log_P_ref + np.log10(abund)
     
-    #Fancier start point
+    #Starting point - ignore atoms.
     n_e, ns, mu, Ui = ns_from_rho_T(rho,T)
+    
     #Convert number density to log partial pressure.
-    logp_atom = np.log10((np.concatenate(([n_e], ns))*c.k_B*T).to(u.dyn/u.cm**2).value)
+    if min(ns)<0:
+        import pdb; pdb.set_trace()
+    logp_atom = np.log10((ns*c.k_B*T).to(u.dyn/u.cm**2).value)
+    logpe = np.log10((n_e*c.k_B*T).to(u.dyn/u.cm**2).value)
     x0 = np.ones(linear_matrix.shape[1])*log_P_ref - 12
-    x0[:2] = logp_atom[:2]
-    x0[len(abund)+1] = logp_atom[2]
-    x0[2 + np.arange(len(abund)-1)] = logp_atom[3 + 3*np.arange(len(abund)-1)]
-    x0[len(abund)+2+np.arange(len(abund)-1)] = logp_atom[4 + 3*np.arange(len(abund)-1)]
+    
+    x0[0] = logpe #n_e
+    x0[1+np.arange(len(abund))] = logp_atom[3*np.arange(len(abund))] #neutrals
+    x0[len(abund)+1+np.arange(len(abund))] = logp_atom[3*np.arange(len(abund))+1] #ions
+    
+    #Deplete H, C and O just a little to stop the algorithm getting stuck.
+    x0[1] -= 0.4
+    x0[3] -= 0.2
+    x0[5] -= 0.4
+    
+    #Also start the molecules as 0.5 dex less than their limiting constituent
     x0[-4] = x0[1]-0.5
-    x0[-3] = x0[2]-0.5
-    x0[-2] = x0[4]-0.5
-    x0[-1] = x0[4]-0.5
-    #import pdb; pdb.set_trace()
+    x0[-3] = x0[3]-0.5
+    x0[-2] = x0[5]-0.5
+    x0[-1] = x0[5]-0.5
     
-    res = op.root(eq_solve_func, x0, args=(linear_matrix, linear_b, log_matrix, log_b, log_P_ref, abund))#, method='Krylov')
+    #Now solve for the abundances of the molecules!
+    res = op.root(eq_solve_func, x0, args=(linear_matrix, linear_b, log_matrix, log_b, log_P_ref, abund),method='lm')#, )
     
+    #For testing, we can make a plot here!
     if plot:
         natom = len(abund)
+        nmol = len(tsuji_K['mol'])
         plt.clf()
+        plt.xticks(np.arange(natom + nmol), np.concatenate((elt_names, tsuji_K['mol'].data)))
         plt.plot(x0[1:natom+1], 'ro')
         plt.plot(x0[natom+1:], 'go')
         plt.plot([x0[0]], 'rs')
-        plt.plot(res.x[1:natom+1],'r')
-        plt.plot(res.x[natom+1:],'g')
-        plt.plot([res.x[0]], 'kx')
+        plt.plot(res.x[1:natom+1],'r', label='Neutral solution')
+        plt.plot(res.x[natom+1:],'g', label='Ionised solution')
+        plt.plot([res.x[0]], 'kx', label='Electron solution')
+        plt.plot([logp_atom[2]], 'ko', label='H-')
+        plt.legend()
         if (np.min(res.x) < -20):
-            plt.ylim([-20,np.max(res.x)+0.2])
+            plt.ylim([-25,np.max(res.x)+0.5])
+        plt.ylabel(r'log$_{10}$(p) (dyn/cm$^2$)')
     
     #import pdb; pdb.set_trace()
+    #test = eq_solve_func(res.x, linear_matrix, linear_b, log_matrix, log_b, log_P_ref, abund)
     if res.success:
-        return res.x
+        return np.concatenate( (res.x, [logp_atom[2]]))
     else:
         import pdb; pdb.set_trace()
 
@@ -194,7 +248,7 @@ def simplified_eos_rho_T(rho, T, ionised=True):
     Adiabatic index (dimensionless)
     """
     #Input the abundances of the elements
-    abund, masses, n_p, ionI, ionII, gI, gII, gIII  = solarmet()
+    abund, masses, n_p, ionI, ionII, gI, gII, gIII, elt_names  = solarmet()
     
     #Find the number density of H
     n_h = rho/(np.sum(abund*masses)*u.u)
@@ -220,8 +274,10 @@ def saha(n_e, T):
     
     Parameters
     ----------
-    n_e: the dimensioned electron number density
-    T: Temperature in K.
+    n_e: double
+        the electron number density in cm^{-3}
+    T: double
+        Temperature in K.
     
     Returns
     -------
@@ -232,22 +288,20 @@ def saha(n_e, T):
     """
     
     #Input the abundances of the elements
-    abund, masses, n_p, ionI, ionII, gI, gII, gIII  = solarmet()
+    abund, masses, n_p, ionI, ionII, gI, gII, gIII, elt_names  = solarmet()
     n_elt = len(n_p)
     
     #Find the Deybe length, and the decrease in the ionization potential in eV, 
     #according to Mihalas 9-178
     deybe_length = np.sqrt(deybe_const*T/n_e)
     z1_delchi = delchi_const/deybe_length
-    print(z1_delchi)
     
     #This will break for very low temperatures. In this case, fix a zero  
     #ionization fraction
     if (T<1000):
-        ns = np.zeros(n_elt*3 - 1)
-        ns[0] = abund[0]
-        ns[2 + 3*np.arange(n_elt-1)] = abund[1+np.arange(n_elt-1)]
-        ns = n_e*1e15*ns
+        ns = np.zeros(n_elt*3)
+        ns[3*np.arange(n_elt)] = abund
+        ns = np.maximum(n_e*1e15*ns, 1e-300)
     else:
         #The thermal de Broglie wavelength. See dimensioned version of 
         #this constant above
@@ -255,36 +309,50 @@ def saha(n_e, T):
     
         #Hydrogen ionization. We neglect the excited states because
         #they are only important when the series diverges... 
-        h1  = 2./debroglie**3 *gII[0]/gI[0]*np.exp(-(ionI[0] - n_p[0]*z1_delchi)*eV_Boltzmann_const/T)  
+        #!!! h1  = 2./debroglie**3 *gII[0]/gI[0]*np.exp(-(ionI[0] - n_p[0]*z1_delchi)*eV_Boltzmann_const/T)  
     
         #Now construct our matrix of n_elt*3-1 equations defining these number densities.
-        A = np.zeros( (3*n_elt-1,3*n_elt-1) );
-        A[0,0:2]=[-h1/n_e,1]
-        for i in range(1,n_elt):
-            #Element ionization. NB excited states are still nearly ~20ev higher for He.
-            he1 = 2./debroglie**3 *gII[i]/gI[i]*np.exp(-(ionI[i] - n_p[i]*z1_delchi)*eV_Boltzmann_const/T) 
-    
-            #Element double-ionization
-            he2 = 2./debroglie**3 *gIII[i]/gII[i]*np.exp(-(ionII[i] - n_p[i]*z1_delchi)*eV_Boltzmann_const/T)
+        A = np.zeros( (3*n_elt,3*n_elt) );
+        for i in range(n_elt):
+            #Our first equation for this element: the ratio of the sum of element number
+            #densities to H number densities is the ratio of abundances.
+            A[3*i,  3*i:3*(i+1)] = [-abund[0],-abund[0],-abund[0]]
+            A[3*i,  :3] = [abund[i],abund[i],abund[i]]
+            
+            #Element single ionization. 
+            he1 = 2./debroglie**3 *gII[i]/gI[i]*np.exp(-(ionI[i] - n_p[i]*z1_delchi)*eV_Boltzmann_const/T)
+            #The second equation for this element: 
+            A[3*i+1,3*i:3*i+2]=[-he1/n_e, 1]
+                
+            #Element double-ionization, or H-
+            if i == 0:
+                he2 = 2./debroglie**3 *gI[i]/gIII[i]*np.exp(-(np.abs(ionII[i]) - n_p[i]*z1_delchi)*eV_Boltzmann_const/T)
+                A[3*i+2,3*i:3*i+3]  =[1,0,-he2/n_e]   
+            else:
+                #The same as the single ionization formula! 
+                he2 = 2./debroglie**3 *gIII[i]/gII[i]*np.exp(-(ionII[i] - n_p[i]*z1_delchi)*eV_Boltzmann_const/T)
+                A[3*i+2,3*i+1:3*i+3]  =[-he2/n_e, 1]
 
-            A[3*i-2,3*i-1:3*i+1]=[-he1/n_e, 1]
-            A[3*i-1,3*i:3*i+2]  =[-he2/n_e, 1]
-            A[3*i,:2]  =[abund[i],abund[i]]
-            A[3*i,3*i-1:3*i+2] = [-abund[0],-abund[0],-abund[0]]
-        A[-1,:] =np.concatenate(([0,1], np.tile([0,1,2], n_elt-1)))
+        #Add in the equation for electron number density. This over-writes the equation
+        #n_H + n_H  
+        A[0,:] =np.concatenate(([0,1,-1], np.tile([0,1,2], n_elt-1)))
         
-        #Convert the electron density to a dimensionless value prior to solving.
-        b =np.zeros((3*n_elt-1))
-        b[-1] = n_e
-        ns =np.linalg.solve(A,b)
-        ns = np.maximum(ns,1e-6)
+        #Now solve Ax=b, where b only has one non-zero number (the electron 
+        #number density)
+        b =np.zeros((3*n_elt))
+        b[0] = n_e
+        ns = np.linalg.solve(A,b)
+        
+        #Make sure that all number densities are positive.
+        ns = np.maximum(ns,1e-300) 
         #import pdb; pdb.set_trace()
     
     #The next lines ensure ionization at high electron pressure, roughly due to nuclei 
     #being separated by less. than the size of an atom. 
     #There is also a hack included based on a typical atom size.
-    ns_highT = np.zeros(n_elt*3 - 1)
-    ns_highT[1 + np.arange(n_elt)*3] = abund
+    ns_highT = np.zeros(n_elt*3)
+    ns_highT[1] = abund[0]
+    ns_highT[2 + np.arange(n_elt-1)*3] = abund[1:]
     ns_highT=ns_highT/(abund[0]+2*np.sum(abund[1:]))*n_e
     atom_size = 1e-8 #In cm
     if (n_e*atom_size**3 > 2):
@@ -293,13 +361,10 @@ def saha(n_e, T):
     elif (n_e*atom_size**3 > 1):
         frac=((n_e*atom_size **3) - 1)/1.0
         ns = frac*ns_highT + (1-frac)*ns
-        
-
-    
-        
+                
     #For normalization... we need the number density of Hydrogen
-    #nuclei, which is the sum of the number densities of H and H+.
-    n_h = np.sum(ns[:2])
+    #nuclei, which is the sum of the number densities of H and H+ and H-
+    n_h = np.sum(ns[:3])
     
     #Density. Masses should be scalars.
     rho_cgs = n_h*np.sum(abund*masses)*c.u.to(u.g).value
@@ -313,7 +378,7 @@ def saha(n_e, T):
     
     #Finally, we should compute the internal energy with respect to neutral gas.
     #This is the internal energy per H atom, divided by the mass in grams per H atom. 
-    Ui=(ns[1]*13.6 + ns[3]*24.58 + ns[4]*(54.403+24.58))*u.eV/n_h/np.sum(abund*masses*u.u);
+    Ui=(ns[1]*13.6 + ns[4]*24.58 + ns[5]*(54.403+24.58))*u.eV/n_h/np.sum(abund*masses*u.u);
     
     return rho_cgs, mu, Ui, ns
     
@@ -333,9 +398,10 @@ def ns_from_rho_T(rho,T):
     #Start with the electron number density equal in mol/cm^3 equal to the density
     #in g/cm^3, or a much lower number at low temperatures. Modify it a little to help
     #starting point at low T
+    #FIXME: This stopped working well once H- was added.
     x0 = np.log(rho_in_g_cm3)
     T_K = np.maximum(T.to(u.K).value,1000)
-    x0 += np.log(2/(np.exp(50e3/T_K) + 1))
+    x0 += np.log(2/(10*np.exp(40e3/T_K) + 1))
     
     #The following line is the important one that can't have units associated
     #with it, as it takes too long.
@@ -356,7 +422,7 @@ def compute_entropy(rho, T):
     
     #Now that we have the number densities of all ions, we can compute 
     #their de Broglie wavelengths. 
-    abund, masses, n_p, ionI, ionII, gI, gII, gIII = solarmet()
+    abund, masses, n_p, ionI, ionII, gI, gII, gIII, elt_names = solarmet()
     imass, ig = ion_mass_g(masses, gI, gII, gIII)
     
     #Add in the electron with spin 1/2
@@ -394,7 +460,7 @@ def eos_rho_T(rho, T, full_output=False):
     if T<3000*u.K:
         return simplified_eos_rho_T(rho, T, ionised=False)
     
-    #Compute number dnsities
+    #Compute number densities
     n_e, ns, mu, Ui  = ns_from_rho_T(rho,T)
         
     #The total gas pressure is just the sum of the number densities multiplied by kT
@@ -558,29 +624,23 @@ def rho_s_tables(rhos, ss, savefile=''):
         
 
 if __name__=='__main__':
-    if False: #Find a low temperature chemical equilibrium.
-        rho = 1e-7*u.g/u.cm**3 #1e-9, fails at 1e-10. 1e-9
-        T = 2500*u.K #2300K, fails at 4500K. 2300
-        linear_matrix, linear_b, log_matrix, log_b, log_P_ref = equilibrium_equation(rho, T)
-        logPs = equilibrium_solve(rho, T, plot=True)
-        #logPs = []
-        #for T in (np.linspace(1800,4500,28)*u.K):
-        #    logPs += [equilibrium_solve(rho, T, plot=True)]
-        #logPs = np.array(logPs)
+	#Here are a series of simple standalone tests, which you can run if you want!
+	
+	#Test 1: Chemical equilibrium for a Proxima Cen like atmosphere.
+    if True: #Find a low temperature chemical equilibrium.
+        Ts = (np.array([1500,1660,1930,2350,3320]))*u.K
+        Pg = np.array([2e3,1e4,1e5,1e6,1e7])*u.dyn/u.cm**2 
+        #A rough density based on a mean molecular weight of 1.5
+        rhos = (Pg/(c.k_B*Ts)*u.u*1.5).to(u.g/u.cm**3)
+        #linear_matrix, linear_b, log_matrix, log_b, log_P_ref = equilibrium_equation(rho, T)
+        logPs = []
+        for rho, T in zip(rhos, Ts):
+            print("Doing temperature: {:.1f}".format(T))
+            logPs += [equilibrium_solve(rho, T, plot=True)]
+            plt.pause(.5)
+        logPs = np.array(logPs)
    
-    if False: 
-        spec_entropy = compute_entropy(1e-6*u.g/u.cm**3, 1.15e4*u.K)
-        print(spec_entropy)
-    
-    if True: #Saha Test.
-        rho, mu, Ui, ns = saha(1e24, 1e6)
-        abund, masses, n_p, ionI, ionII, gI, gII, gIII  = solarmet()
-        np.set_printoptions(formatter={'float_kind':"{:.2f}".format})
-        print(ns[0]/(ns[0] + ns[1]))
-        for i in range(12):
-            print(ns[2+3*i:5+3*i]/np.sum(ns[0:2])/abund[i+1])
-        print(rho)
-        
+    #Test 2: Stellar interiors
     if False:
         #Gamma3-1 is d log(T) / dlog(rho). We start with 1g/cm**3 and a 
         #temperature of 4 MK, and use Gamma3 to solve the differential
@@ -597,8 +657,9 @@ if __name__=='__main__':
     
         print("Computed profile entropies")
     
-    rhos = np.logspace(-9,3,27)*u.g/u.cm**3
+    #Test 3: Stellar interiors
     if False:
+        rhos = np.logspace(-9,3,27)*u.g/u.cm**3
         Ts = []
         s = 20
         for rho in rhos:
@@ -606,7 +667,7 @@ if __name__=='__main__':
         plt.loglog(rhos.value, Ts)
         print("Computed profile based on entropy")
     
-    if False:
+    
         P_tab, gamma1_tab, T_tab = rho_s_tables(rhos, 12 + np.arange(11), savefile='adiabats.fits')
         for i in range(len(T_tab)):
             plt.plot(rhos.value, T_tab[i])
