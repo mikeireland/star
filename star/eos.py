@@ -31,23 +31,23 @@ def solarmet():
     Degeneracy and ionization energies from IA05 in Scholz code
     
     H++ is actually H-, and the code treats this appropriately as a special case"""
-    elt_names = np.array(['H', 'He',   'C',   'N',   'O',   'Ne',  'Na',  'Mg',  'Si',  'S',   'K',   'Ca',  'Fe'])
-    n_p =        np.array([1,   2,      6,     7,     8,     10,    11,    12,    14,    16,    19,    20,    26])
-    masses=      np.array([1.0, 4.0,    12.01, 14.01, 16.00, 18.0,  22.99, 24.31, 28.09, 32.06, 39.10, 40.08, 55.85])
-    abund = 10**(np.array([12, 10.93,   8.43,  7.83,  8.69,  7.93,  6.24,  7.60,  7.51,  7.12,  5.03,  6.34,  7.50])-12)
-    ionI  =      np.array([13.595,24.58,11.26, 14.53, 13.61, 21.56, 5.14,  7.644, 8.149, 10.357,4.339, 6.111, 7.87])
-    ionII  =     np.array([-0.754,  54.403,  24.376,29.593,35.108,40.96, 47.29, 15.03, 16.34, 23.40, 31.81, 11.87, 16.18])
+    elt_names = np.array(['H', 'He',   'C',   'N',   'O',   'Ne',  'Na',  'Mg',  'Si',  'S',   'K',   'Ca',  'Fe',  'Ti'])
+    n_p =        np.array([1,   2,      6,     7,     8,     10,    11,    12,    14,    16,    19,    20,    26,     22])
+    masses=      np.array([1.0, 4.0,    12.01, 14.01, 16.00, 18.0,  22.99, 24.31, 28.09, 32.06, 39.10, 40.08, 55.85, 47.9])
+    abund = 10**(np.array([12, 10.93,   8.43,  7.83,  8.69,  7.93,  6.24,  7.60,  7.51,  7.12,  5.03,  6.34,  7.50, 4.95])-12)
+    ionI  =      np.array([13.595,24.58,11.26, 14.53, 13.61, 21.56, 5.14,  7.644, 8.149, 10.357,4.339, 6.111, 7.87, 6.82])
+    ionII  =     np.array([-0.754,  54.403,  24.376,29.593,35.108,40.96, 47.29, 15.03, 16.34, 23.40, 31.81, 11.87, 16.18, 13.57])
 
     #Degeneracy of many of these elements are somewhat temperature-dependent,
     #as it is really a partition function. But as this is mostly H/He plus 
     #other elements as a mass reservoir and source of low-T
     #electrons, we're ignoring this. 
-    gI =   np.array([2,1,9,4,9,1,2,1,9,9,2,1,25])
-    gII =  np.array([1,2,6,9,4,6,1,2,6,4,1,2,30])
+    gI =   np.array([2,1,9,4,9,1,2,1,9,9,2,1,25,21])
+    gII =  np.array([1,2,6,9,4,6,1,2,6,4,1,2,30,28])
     
     #A lot of these degeneracies are educated guesses! But we're not worried
     #about most elements in the doubly ionized state. 
-    gIII = np.array([1,1,1,6,9,9,6,1,1,9,6,1,30])
+    gIII = np.array([1,1,1,6,9,9,6,1,1,9,6,1,30,1])
     return abund, masses, n_p, ionI, ionII, gI, gII, gIII, elt_names
     
 def equilibrium_equation(rho, T):
@@ -170,12 +170,14 @@ def equilibrium_solve(rho, T, plot=False):
     x0[1+np.arange(len(abund))] = logp_atom[3*np.arange(len(abund))] #neutrals
     x0[len(abund)+1+np.arange(len(abund))] = logp_atom[3*np.arange(len(abund))+1] #ions
     
-    #Deplete H, C and O just a little to stop the algorithm getting stuck.
+    #Deplete H, C, O, N, Ti just a little to stop the algorithm getting stuck.
     x0[1] -= 0.4
     x0[3] -= 0.2
+    x0[4] -= 0.2
     x0[5] -= 0.4
+    x0[14] -= 0.3
     
-    #Also start the molecules as 0.5 dex less than their limiting constituent
+    #Also start the most abundant molecules as 0.5 dex less than their limiting constituent
     x0[-4] = x0[1]-0.5
     x0[-3] = x0[3]-0.5
     x0[-2] = x0[5]-0.5
@@ -283,7 +285,7 @@ def saha(n_e, T):
     -------
     rho: astropy.units quantity compatible with density
     mu: Mean molecular weight (dimensionless, i.e. to be multiplied by the AMU)
-    ns: A vector of number densities of H, H+, He, He+, He++
+    ns: A vector of number densities of H, H+, He, He+, He++ in cm^{-3}
     
     """
     
@@ -389,6 +391,15 @@ def saha_solve(log_n_e_mol_cm3, T, rho_0_in_g_cm3):
     rho, mu, Ui, ns = saha(n_e, T)
     
     return np.log(rho_0_in_g_cm3/rho)
+
+def saha_solve_P(log_n_e_mol_cm3, P_0_cgs, T):
+    """Dimensionless version of the Saha equation routine, to use in np.solve to
+    solve for n_e at a fixed density."""
+    n_e = np.exp(log_n_e_mol_cm3[0])*c.N_A.value
+    rho, mu, Ui, ns = saha(n_e, T)
+    #Ideal gas equation...
+    P = rho/mu*(c.k_B*T*u.K/u.u).cgs.value
+    return np.log(P_0_cgs/P)
  
 def ns_from_rho_T(rho,T):
     """Compute number densities given a density and temeprature"""
@@ -413,7 +424,26 @@ def ns_from_rho_T(rho,T):
 
     #Return dimensioned quantities
     return n_e*(u.cm**(-3)), ns*(u.cm**(-3)), mu, Ui 
- 
+
+def ns_from_P_T(P,T):
+    """Compute number densities given a pressure and temperature"""
+    
+    P_cgs = P.to(u.dyne/u.cm**2).value
+    
+    #Same as ns_from_rho_T, at a mu=1.
+    x0 = np.log(P_cgs/((c.k_B*T*u.K/u.u).cgs.value))
+    T_K = np.maximum(T.to(u.K).value,1000)
+    x0 += np.log(2/(10*np.exp(40e3/T_K) + 1))
+    
+    #The following line is the important one that can't have units associated
+    #with it, as it takes too long.
+    res = op.fsolve(saha_solve_P, x0, args=(P_cgs, T.cgs.value), xtol=1e-6)
+    n_e = np.exp(res[0])*c.N_A.value
+    rho, mu, Ui, ns = saha(n_e, T.cgs.value)
+    
+    #Return dimensioned quantities
+    return n_e*(u.cm**(-3)), ns*(u.cm**(-3)), mu, Ui, rho
+
 def compute_entropy(rho, T):
     """Compute the specific entropy for a gas mixture of density rho 
     and temperature T"""
@@ -621,17 +651,84 @@ def rho_s_tables(rhos, ss, savefile=''):
             hdulist = pyfits.HDUList([hdu1, hdu2, hdu3])
             hdulist.writeto(savefile, overwrite=True)
     return P_tab, gamma1_tab, T_tab
+
+def P_T_tables(Ps, Ts, savefile=''):
+    """
+    For an array of densities and specific entropies, create tables of
+    density (TODO: gammas and entropy).
+    
+    Pressures are assumed in a logarithmic grid.
+    
+    Parameters
+    ----------
+    Ps : array
+        input pressure list.
+    Ts : array
+        input temperature list.
+
+    Returns
+    -------
+    density, internal energy, number densities tables
+
+    """
+    Ps_log = np.log(Ps.to(u.dyne/u.cm**2).value)
+    nP = len(Ps)
+    nT = len(Ts)
+    rho_tab = np.empty((nP, nT))
+    mu_tab = np.empty((nP, nT))
+    Ui_tab = np.empty((nP,nT))
+    
+    #Find the number of atoms and ions
+    n_e, ns, mu, Ui, rho  = ns_from_P_T(Ps[0], Ts[0])
+    n_species = len(ns)
+    
+    ns_tab = np.empty((nP,nT,n_species))
+    n_e_tab = np.empty((nP,nT))
+    
+    #gamma1_tab = np.empty((nT, nP))
+    #entropy_tab = np.empty((nT, nP))
+    for i, P in enumerate(Ps):
+        for j, T in enumerate(Ts):
+            #Compute number densities and densities.
+            n_e, ns, mu, Ui, rho  = ns_from_P_T(P, T)
+            
+            rho_tab[i,j] = rho #Already in cgs
+            Ui_tab[i,j] = Ui.to(u.erg/u.g).value
+            mu_tab[i,j] = mu
+            ns_tab[i,j] = ns.cgs.value
+            n_e_tab[i,j] = n_e.cgs.value
+        
+    if len(savefile)>0:
+            hdu1 = pyfits.PrimaryHDU(rho_tab)
+            hdu1.header['CRVAL1'] = Ts[0].cgs.value
+            hdu1.header['CDELT1'] = (Ts[1]-Ts[0]).cgs.value
+            hdu1.header['CTYPE1'] = 'Temperature [K]'
+            hdu1.header['CRVAL2'] = (Ps_log[0])/np.log(10)
+            hdu1.header['CDELT2'] = (Ps_log[1]-Ps_log[0])/np.log(10)
+            hdu1.header['CTYPE2'] = 'log10(pressure) [dyne/cm^2]'
+            hdu1.header['EXTNAME'] = 'rho [g/cm**3]'
+            hdu2 = pyfits.ImageHDU(Ui_tab)
+            hdu2.header['EXTNAME'] = 'Ui [erg/g]'
+            hdu3 = pyfits.ImageHDU(mu_tab)
+            hdu3.header['EXTNAME'] = 'mu'
+            hdu4 = pyfits.ImageHDU(ns_tab)
+            hdu4.header['EXTNAME'] = 'ns'
+            hdu5 = pyfits.ImageHDU(n_e_tab)
+            hdu5.header['EXTNAME'] = 'n_e'
+            hdulist = pyfits.HDUList([hdu1, hdu2, hdu3, hdu4, hdu5])
+            hdulist.writeto(savefile, overwrite=True)
+    return rho_tab, Ui_tab, mu_tab, ns_tab
         
 
 if __name__=='__main__':
 	#Here are a series of simple standalone tests, which you can run if you want!
 	
 	#Test 1: Chemical equilibrium for a Proxima Cen like atmosphere.
-    if True: #Find a low temperature chemical equilibrium.
+    if False: #Find a low temperature chemical equilibrium.
         Ts = (np.array([1500,1660,1930,2350,3320]))*u.K
         Pg = np.array([2e3,1e4,1e5,1e6,1e7])*u.dyn/u.cm**2 
         #A rough density based on a mean molecular weight of 1.5
-        rhos = (Pg/(c.k_B*Ts)*u.u*1.5).to(u.g/u.cm**3)
+        rhos = (Pg/(c.k_B*Ts)*u.u*1.5).to(u.g/u.cm**3) 
         #linear_matrix, linear_b, log_matrix, log_b, log_P_ref = equilibrium_equation(rho, T)
         logPs = []
         for rho, T in zip(rhos, Ts):
@@ -671,6 +768,12 @@ if __name__=='__main__':
         P_tab, gamma1_tab, T_tab = rho_s_tables(rhos, 12 + np.arange(11), savefile='adiabats.fits')
         for i in range(len(T_tab)):
             plt.plot(rhos.value, T_tab[i])
+            
+    #Test 4: Make an equation of state table
+    if True:
+        Ps = np.logspace(-4,6,41)*u.dyn/u.cm**2
+        Ts = (2000 + 500*np.arange(47))*u.K
+        P_T_tables(Ps, Ts, savefile='rho_Ui_mu_ns_ne.fits')
         
         
         
