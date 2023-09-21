@@ -3,6 +3,7 @@ import astropy.constants as c
 import numpy as np
 import astropy.io.fits as pyfits
 import matplotlib.pyplot as plt
+from scipy.interpolate import RegularGridInterpolator
 plt.ion()
 
 """
