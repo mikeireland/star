@@ -2,7 +2,7 @@
 TODO:
 1) Output a complete table for convective star student use (not including M
 dwarfs)
-2) Add in TiO
+
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -285,7 +285,7 @@ def saha(n_e, T):
     -------
     rho: astropy.units quantity compatible with density
     mu: Mean molecular weight (dimensionless, i.e. to be multiplied by the AMU)
-    ns: A vector of number densities of H, H+, He, He+, He++ in cm^{-3}
+    ns: A vector of number densities of H, H+, H-, He, He+, He++ in cm^{-3}
     
     """
     
@@ -677,6 +677,8 @@ def P_T_tables(Ps, Ts, savefile=''):
     rho_tab = np.empty((nP, nT))
     mu_tab = np.empty((nP, nT))
     Ui_tab = np.empty((nP,nT))
+    Q_tab = np.empty((nP,nT))
+    cP_tab = np.empty((nP,nT))
     
     #Find the number of atoms and ions
     n_e, ns, mu, Ui, rho  = ns_from_P_T(Ps[0], Ts[0])
@@ -687,16 +689,25 @@ def P_T_tables(Ps, Ts, savefile=''):
     
     #gamma1_tab = np.empty((nT, nP))
     #entropy_tab = np.empty((nT, nP))
+    dT = 1*u.K #A small amount of temperature!
+    k_b_u_cgs = (c.k_B/c.u).cgs.value
     for i, P in enumerate(Ps):
         for j, T in enumerate(Ts):
-            #Compute number densities and densities.
+            #Compute number densities and densities, and also a single-sided derivative
             n_e, ns, mu, Ui, rho  = ns_from_P_T(P, T)
+            _, _, mu_plus, Ui_plus, rho_plus = ns_from_P_T(P, T + dT)
             
+            #Fill in the tables not involving derivatives
             rho_tab[i,j] = rho #Already in cgs
             Ui_tab[i,j] = Ui.to(u.erg/u.g).value
             mu_tab[i,j] = mu
             ns_tab[i,j] = ns.cgs.value
             n_e_tab[i,j] = n_e.cgs.value
+            
+            #Now the tables involving derivatives
+            Q_tab[i,j] = 1 - (mu_plus - mu)/dT * T/mu
+            cP_tab[i,j] = ((Ui_plus - Ui)/dT).cgs.value + 5/2*k_b_u_cgs*Q_tab[i,j]/mu_tab[i,j] 
+
         
     if len(savefile)>0:
             hdu1 = pyfits.PrimaryHDU(rho_tab)
@@ -712,10 +723,14 @@ def P_T_tables(Ps, Ts, savefile=''):
             hdu3 = pyfits.ImageHDU(mu_tab)
             hdu3.header['EXTNAME'] = 'mu'
             hdu4 = pyfits.ImageHDU(ns_tab)
-            hdu4.header['EXTNAME'] = 'ns'
+            hdu4.header['EXTNAME'] = 'ns [cm^-3]'
             hdu5 = pyfits.ImageHDU(n_e_tab)
-            hdu5.header['EXTNAME'] = 'n_e'
-            hdulist = pyfits.HDUList([hdu1, hdu2, hdu3, hdu4, hdu5])
+            hdu5.header['EXTNAME'] = 'n_e [cm^-3]'
+            hdu6 = pyfits.ImageHDU(Q_tab)
+            hdu6.header['EXTNAME'] = 'Q'
+            hdu7 = pyfits.ImageHDU(cP_tab)
+            hdu7.header['EXTNAME'] = 'cP [erg/K/g]'
+            hdulist = pyfits.HDUList([hdu1, hdu2, hdu3, hdu4, hdu5,hdu6,hdu7])
             hdulist.writeto(savefile, overwrite=True)
     return rho_tab, Ui_tab, mu_tab, ns_tab
         
@@ -773,7 +788,7 @@ if __name__=='__main__':
     if True:
         Ps = np.logspace(-4,6,41)*u.dyn/u.cm**2
         Ts = (2000 + 500*np.arange(47))*u.K
-        P_T_tables(Ps, Ts, savefile='rho_Ui_mu_ns_ne.fits')
+        P_T_tables(Ps, Ts, savefile='rho_Ui_mu_ns_ne_Q_cP.fits')
         
         
         

@@ -10,6 +10,12 @@ plt.ion()
 This is based on:
 https://iopscience.iop.org/article/10.3847/1538-4357/ac9b40/pdf
 
+NB there are other resources for non-stellar atmosphere opacities, 
+e.g.
+https://chiantipy.readthedocs.io/en/latest/
+https://chianti-atomic.github.io/api/ChiantiPy.core.html#id91
+http://spiff.rit.edu/classes/phys370/lectures/statstar/statstar_python3.py
+
 """
 
 #From OCR online, from https://articles.adsabs.harvard.edu/pdf/1988A%26A...193..189J

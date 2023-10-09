@@ -11,17 +11,17 @@ from scipy.integrate import cumtrapz
 plt.ion()
 
 #log(g) in cgs units
-logg = 3.0
+logg = 4.3 #About a main sequence A0 star. 
 
 #Temperature in K. NB: As we're not dealing with convection yet, we can't 
 #go much less than 10,000K.
 Teff=10000
 
 #Number of iterations
-Niter = 20
+Niter = 40
 
 #Number of tau grid points
-Ntau = 21
+Ntau = 50
 
 #Number of frequency grid points
 Nnu = 500
@@ -31,13 +31,14 @@ nu_max = 3e8/30e-9 #30nm as a frequency
 Htarg = (c.sigma_sb*(Teff*u.K)**4/4/np.pi).cgs.value
 
 #Gravity in physical units
-grav = (10**logg) * u.cm/u.s**2
+grav = (10**logg) #* u.cm/u.s**2
 
 #Make a tau grid that is finer towards the surface.
-tau_ross_grid = 5*np.linspace(0,1,Ntau)**2
+tau_ross_grid = 10*np.linspace(0,1,Ntau)**5
 
 #Create an initial T(tau)
-Ttau = Teff*(3/4*(tau_ross_grid + 2/3))**(1/4)
+Ttau0 = Teff*(3/4*(tau_ross_grid + 2/3))**(1/4)
+Ttau = Ttau0.copy()
 
 #Some frequencies
 dnu = nu_max/Nnu
@@ -97,10 +98,12 @@ def calc_Bnu(T, nu):
 	
 plt.clf()
 #Now the iterative loop...
+DeltaT = np.ones(Ntau)
+accelerated = True
 for i in range(Niter):
 	#Solve equation of hydrostatic equilibrium, giving us our thermodynamic constants
 	#dP/dtau = g/kappaR_bar
-	res = solve_ivp(dPdtau, [0,np.max(tau_ross_grid)], [10**Plog10_grid[8]], t_eval = tau_ross_grid)
+	res = solve_ivp(dPdtau, [0,np.max(tau_ross_grid)], [10**Plog10_grid[10]], t_eval = tau_ross_grid)
 	Ptau = res.y[0]
 	
 	#Create 1-dimensional functions of key variables. We end each of these in 
@@ -160,7 +163,15 @@ for i in range(Niter):
 	#for the integral
 	integral = np.concatenate(([0],cumtrapz(chi_H/kappa_B*DeltaH, tau_ross_grid)))
 	RHS = kappa_J/kappa_B*J - B + kappa_J/kappa_B/f *(integral + f[0]*DeltaH[0]/g0)
+	last_DeltaT = DeltaT.copy()
 	DeltaT = RHS*np.pi/4/(c.sigma_sb*(Ttau*u.K)**3).cgs.value
+	r = DeltaT/last_DeltaT
+	if (np.max(r) < 1.2) and not accelerated:
+		accelerated = True
+		print("Accelerating the increment!!!")
+		DeltaT *= 1/(1-np.minimum(r,0.9))
+	else:
+		accelerated = False
 	Ttau += DeltaT
 	print("This DeltaT: ")
 	print(DeltaT)

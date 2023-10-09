@@ -141,8 +141,6 @@ def phi_matrix(tau_grid):
 		phi_mat[j,-2] += -E4_vect[-1]/delta_tau[-1]
 	return 0.5*phi_mat
 
-def calc_Bnu(T, nu):
-	return ( 2*c.h*nu**3/c.c**2 / (np.exp(c.h*nu/c.k_B/T) - 1) ).to(u.erg/u.cm**2)
 	
 if __name__=="__main__":
 	#Create a couple of tau grids. The second is random.
